@@ -11,7 +11,7 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 		"version":     version,
 	}
 	err := app.writeResponse(w, struct {
-		Message string
+		Message any
 		Code    int
 		Error   bool
 		Body    interface{}
