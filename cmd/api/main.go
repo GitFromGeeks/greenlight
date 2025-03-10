@@ -13,6 +13,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"greenlight.altamash.dev/internal/data"
 
 	_ "github.com/lib/pq"
 )
@@ -33,6 +34,7 @@ type config struct {
 type application struct {
 	config config
 	logger *slog.Logger
+	models data.Models
 }
 
 func main() {
@@ -60,7 +62,7 @@ func main() {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	migrator, err := migrate.NewWithDatabaseInstance("file:///path/to/your/migrations", "postgres", migrationDriver)
+	migrator, err := migrate.NewWithDatabaseInstance("file:///Users/altamash/Documents/go/greenlight/migrations", "postgres", migrationDriver)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
@@ -70,10 +72,15 @@ func main() {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
+
+	logger.Info("database migration applied")
+
 	app := &application{
 		config: cfg,
 		logger: logger,
+		models: data.NewModels(db),
 	}
+
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.port),
 		Handler:      app.routes(),
