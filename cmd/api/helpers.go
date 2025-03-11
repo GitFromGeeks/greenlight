@@ -6,10 +6,30 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
+	"greenlight.altamash.dev/internal/validator"
 )
+
+func (app *application) writeErrorResponse(w http.ResponseWriter, status int, message any) error {
+
+	response := map[string]interface{}{
+		"headers": map[string]interface{}{
+			"message":  message,
+			"code":     status,
+			"error":    true,
+			"metadata": nil,
+		},
+		"body": nil,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(response)
+	return nil
+}
 
 func (app *application) readIDParam(r *http.Request) (int64, error) {
 	params := httprouter.ParamsFromContext(r.Context())
@@ -23,16 +43,18 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 }
 
 func (app *application) writeResponse(w http.ResponseWriter, params struct {
-	Message any
-	Code    int
-	Error   bool
-	Body    interface{}
+	Message  any
+	Code     int
+	Error    bool
+	Body     interface{}
+	MetaData interface{}
 }) error {
 	response := Response{}
 	response.Headers.Message = params.Message
 	response.Headers.Code = params.Code
 	response.Headers.Error = params.Error
 	response.Body = params.Body
+	response.Headers.MetaData = params.MetaData
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(params.Code)
 	json.NewEncoder(w).Encode(response)
@@ -41,9 +63,10 @@ func (app *application) writeResponse(w http.ResponseWriter, params struct {
 
 type Response struct {
 	Headers struct {
-		Message any  `json:"message"`
-		Code    int  `json:"code"`
-		Error   bool `json:"error"`
+		Message  any         `json:"message"`
+		Code     int         `json:"code"`
+		Error    bool        `json:"error"`
+		MetaData interface{} `json:"metadata"`
 	} `json:"headers"`
 	Body interface{} `json:"body"`
 }
@@ -87,4 +110,48 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 		return errors.New("body must only contain a single JSON value")
 	}
 	return nil
+}
+
+func (app *application) readString(qs url.Values, key string, defaultValue string) string {
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+	return s
+}
+
+func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
+	csv := qs.Get(key)
+	if csv == "" {
+		return defaultValue
+	}
+	return strings.Split(csv, ",")
+
+}
+
+func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		v.AddError(key,
+			"must be an integer value")
+		return defaultValue
+	}
+	return i
+}
+
+func (app *application) background(fn func()) {
+	app.wg.Add(1)
+	go func() {
+		defer app.wg.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				app.logger.Error(fmt.Sprintf("%v", err))
+			}
+		}()
+		fn()
+	}()
 }

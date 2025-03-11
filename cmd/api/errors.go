@@ -13,31 +13,10 @@ func (app *application) logError(r *http.Request, err error) {
 	app.logger.Error(err.Error(), "method", method, "uri", uri)
 }
 
-func (app *application) errorResponse(w http.ResponseWriter, r *http.Request, status int, message any) {
-	err := app.writeResponse(w, struct {
-		Message any
-		Code    int
-		Error   bool
-		Body    interface{}
-	}{
-		Message: message,
-		Code:    status,
-		Error:   true,
-		Body:    nil,
-	})
+func (app *application) errorResponse(w http.ResponseWriter, _ *http.Request, status int, message any) {
+	err := app.writeErrorResponse(w, status, message)
 	if err != nil {
-		app.logError(r, err)
-		app.writeResponse(w, struct {
-			Message any
-			Code    int
-			Error   bool
-			Body    interface{}
-		}{
-			Message: "Internal Server Error",
-			Code:    500,
-			Error:   true,
-			Body:    nil,
-		})
+		app.writeErrorResponse(w, 500, "Internal Server Error")
 	}
 }
 
@@ -63,4 +42,16 @@ func (app *application) methodNotAllowedResponse(w http.ResponseWriter, r *http.
 
 func (app *application) badRequestResponse(w http.ResponseWriter, r *http.Request, err error) {
 	app.errorResponse(w, r, http.StatusBadRequest, err.Error())
+}
+
+func (app *application) editConflictResponse(w http.ResponseWriter, r *http.Request) {
+	message :=
+		"unable to update the record due to an edit conflict, please try again"
+	app.errorResponse(w, r, http.StatusConflict, message)
+}
+
+func (app *application) rateLimitExceededResponse(w http.ResponseWriter, r *http.Request) {
+	message :=
+		"rate limit exceeded"
+	app.errorResponse(w, r, http.StatusTooManyRequests, message)
 }

@@ -11,15 +11,17 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 		"version":     version,
 	}
 	err := app.writeResponse(w, struct {
-		Message any
-		Code    int
-		Error   bool
-		Body    interface{}
+		Message  any
+		Code     int
+		Error    bool
+		Body     interface{}
+		MetaData interface{}
 	}{
-		Message: "Health Status",
-		Code:    200,
-		Error:   false,
-		Body:    data,
+		Message:  "Health Status",
+		Code:     200,
+		Error:    false,
+		Body:     data,
+		MetaData: nil,
 	})
 	if err != nil {
 		app.logger.Error(err.Error())
